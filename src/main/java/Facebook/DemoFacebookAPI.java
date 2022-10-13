@@ -17,8 +17,8 @@ import java.util.List;
 import static Facebook.Constants.FacebookConstants.*;
 
 public class DemoFacebookAPI {
-    public static String ACCESS_TOKEN = "EAAGNO4a7r2wBAIZCTCYZB5qXj1JNra7YQ89zZC56OSrMDF7TcGa8MpZCy7xGyrRZCBmss1ifD8O6tPUK7LjZBK8GLmlxK7IhNkIJLZBdtej4mueJIvNEZB9BvULxPQFOLV6R1ZCTsHV2hStEcu5F3j1xOQYz6ZBXxC79C5ZA11VDj3CthZCfg07E0OvOUq52oxG7ZAoEZD";
-    public static String COOKIE = "c_user=100004437857217;xs=24%3A2VnbvPTYFcDqSA%3A2%3A1661067140%3A-1%3A6154%3A%3AAcXue_A4VRq6noO9_-AdHPpf5QLUGq6i9yURhd2IeJ7I";
+    public static String ACCESS_TOKEN = "";
+    public static String COOKIE = "";
     public static void main(String[] args) throws IOException, IllegalAccessException {
         ModWebRequestor modWebRequestor = new ModWebRequestor(COOKIE);
         FacebookClient client = new DefaultFacebookClient(ACCESS_TOKEN,modWebRequestor, new DefaultJsonMapper(),Version.VERSION_4_0);
