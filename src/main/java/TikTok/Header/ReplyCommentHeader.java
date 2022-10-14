@@ -30,4 +30,5 @@ public class ReplyCommentHeader extends BaseHeader {
         this.item_id = item_id;
         init();
     }
+
 }

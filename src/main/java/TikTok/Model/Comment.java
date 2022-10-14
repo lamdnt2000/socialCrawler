@@ -16,6 +16,7 @@ public class Comment implements Serializable {
     private long create_time;
     private int digg_count;
     private int reply_comment_total;
+    private long reply_id;
     private int stick_position;
     private String comment_language="None";
     @JsonProperty("text_extra")

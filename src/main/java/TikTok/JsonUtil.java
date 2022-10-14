@@ -9,6 +9,9 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.stream.Collectors;
+
+import static TikTok.TiktokRequest.generateReplyFromComment;
 
 public class JsonUtil {
     public static ObjectMapper mapper = new ObjectMapper();
@@ -29,15 +32,19 @@ public class JsonUtil {
         return user;
     }
 
-    public static List<Comment> parseJsonComment(String json) throws IOException {
+    public static List<Comment> parseJsonComment(Object obj) throws IOException {
         mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
-        JsonNode node = mapper.readValue(json, JsonNode.class);
-        String jsonItem = mapper.writeValueAsString(node.get("comments"));
-        if (jsonItem.equals("null")){
-            return null;
+        String json = mapper.writeValueAsString(obj);
+        JsonNode[] nodes = mapper.readValue(json, JsonNode[].class);
+        List<Comment> comments = new ArrayList<>();
+        for (JsonNode node: nodes){
+            if (node.get("comments").size()>0){
+                String jsonItem = mapper.writeValueAsString(node.get("comments"));
+                Comment[] result  = mapper.readValue(jsonItem, Comment[].class);
+                comments.addAll(Arrays.asList(result));
+            }
         }
-        Comment[] comments  = mapper.readValue(jsonItem, Comment[].class);
-        return Arrays.asList(comments);
+        return comments;
     }
 
     public static List<Discover> parseJsonDiscorver(String json) throws IOException {
@@ -92,17 +99,6 @@ public class JsonUtil {
         System.out.println("Total heart: "+heart);
     }
 
-    public static void main(String[] args) throws IOException {
-        JsonNode node =mapper.readValue(new File("demo.json"), JsonNode.class);
-        String json = mapper.writeValueAsString(node);
-        List<Comment> comments = parseJsonComment(json);
-        for (Comment c: comments){
-            System.out.println(c.getCid());
-            System.out.println(c.getText());
-            System.out.println(c.getUser().getUid());
-            System.out.println(c.getUser().getNickname());
-            System.out.println(c.getTextExtra());
-        }
-    }
+
 
 }

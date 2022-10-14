@@ -20,18 +20,20 @@ import java.security.InvalidAlgorithmParameterException;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
+import java.util.Map;
+import java.util.concurrent.*;
+import java.util.stream.Collectors;
 
+import static Browser.RandomUserAgent.getRandomUserAgent;
 import static TikTok.JsonUtil.*;
 import static TikTok.TiktokConstants.*;
+import static TikTok.TiktokRequest.excuseMultiFetch;
 
 public class TikTokAPI {
     public static Profile userData;
-
+    public static List<WebDriver> drivers = new ArrayList<>();
     public static Profile getUserProfile(String username, WebDriver driver) throws IOException {
         driver.get("https://tiktok.com");
         driver.get("https://tiktok.com/@" + username);
@@ -50,7 +52,7 @@ public class TikTokAPI {
         ObjectMapper oMapper = new ObjectMapper();
         List<Video> videoList = new ArrayList<>();
         do {
-            ItemListHeader requestHeader = new ItemListHeader(userAgent, user.getSecUid(), cursor, user.getId());
+            ItemListHeader requestHeader = new ItemListHeader(getRandomUserAgent(), user.getSecUid(), cursor, user.getId());
             TiktokRequest tiktokRequest = new TiktokRequest(requestHeader);
             Object itemVideos = tiktokRequest.excuse(driver, URL_ITEM_LIST, true);
             String json = oMapper.writeValueAsString(itemVideos);
@@ -64,33 +66,29 @@ public class TikTokAPI {
             System.out.println(videoList.size());
             Thread.sleep(450);
         } while (hasMore);
-        driver.quit();
         if (isFetchComment) {
-            ExecutorService es = Executors.newFixedThreadPool(3);
-            List<Future<WebDriver>> futures = new ArrayList<>();
-            for (int i=0;i<3;i++){
-                futures.add(es.submit(new MultiBroswer()));
-            }
-            List<WebDriver> drivers = new ArrayList<>();
-            for (int i=0;i<3;i++){
-                drivers.add(futures.get(i).get());
-            }
             List<Future<Video>> futuresItem = new ArrayList<>();
-            for (int i=0;i< videoList.size()-3;i++){
+            ExecutorService exService = new ThreadPoolExecutor(
+                    3,
+                    3,
+                    300L,
+                    TimeUnit.MILLISECONDS,
+                    new LinkedBlockingQueue<>(videoList.size()));
+            int j = 0;
+            for (int i = 0; i < videoList.size(); i++) {
 
-               for (WebDriver d: drivers){
-                   Video v = videoList.get(i++);
-                   futuresItem.add(es.submit(new FetchComment(username,v,d)));
-               }
-
+                Video v = videoList.get(i);
+                futuresItem.add(exService.submit(new FetchComment(username, v, drivers.get(j++))));
+                if (j == 3) {
+                    j = 0;
+                }
             }
             List<Video> videos = new ArrayList<>();
-            for (Future<Video> f: futuresItem){
-                Video v = f.get();
+            for (int i = 0; i < videoList.size(); i++) {
+                Video v = futuresItem.get(i).get();
                 System.out.println(v.getComments().size());
                 videos.add(v);
             }
-            es.shutdown();
             user.setVideos(videos);
         }
 
@@ -99,8 +97,9 @@ public class TikTokAPI {
 
     public static List<Comment> getCommentsByVideo(String username, Video video, WebDriver driver) throws IOException, InvalidAlgorithmParameterException, NoSuchPaddingException, IllegalBlockSizeException, NoSuchAlgorithmException, BadPaddingException, InvalidKeyException, IllegalAccessException, InterruptedException {
         String id = video.getId();
-        System.out.println("Start "+id);
+        System.out.println("Start " + id);
         driver.get(String.format("https://www.tiktok.com/@%s/video/%s?is_from_webapp=v1&item_id=%s", username, id, id));
+        int commentCount = (int) video.getStats().getCommentCount();
         String userAgent = getUserAgent(driver);
         ObjectMapper oMapper = new ObjectMapper();
         List<Comment> comments = new ArrayList<>();
@@ -115,57 +114,53 @@ public class TikTokAPI {
             flag = false;
         }
         if (flag) {
-            int cursor = 0;
-            int hasMore = 0;
-            do {
-                CommentHeader requestHeader = new CommentHeader(userAgent, id, cursor);
-                TiktokRequest tiktokRequest = new TiktokRequest(requestHeader);
-                Object itemVideos = tiktokRequest.excuse(driver, URL_COMMENT_LIST, false);
-                String json = oMapper.writeValueAsString(itemVideos);
-                List<Comment> result = JsonUtil.parseJsonComment(json);
-                JsonNode videoResult = oMapper.readValue(json, JsonNode.class);
-                hasMore = videoResult.get("has_more").intValue();
-                if (hasMore == 1) {
-                    cursor = videoResult.get("cursor").intValue();
-                }
-                if (result != null) {
-                    for (int i = 0; i < result.size(); i++) {
-                        Comment c = result.get(i);
-                        if (c.getReply_comment_total() > 0) {
-                            c.setReplies(getCommentsReply(id, c, driver));
-                        }
-                    }
-                    comments.addAll(result);
-                }
-                Thread.sleep(450);
-            } while (hasMore == 1);
+            CommentHeader header = new CommentHeader(getRandomUserAgent(), id, 0);
+            TiktokRequest<CommentHeader> request = new TiktokRequest<>(header);
+            List<String> params = request.bulkCommentRequest(commentCount, 25);
+            for (String p : params) {
+                Object object = excuseMultiFetch(p, driver);
+                List<Comment> list = parseJsonComment(object);
+                comments.addAll(list);
+                Thread.sleep(3500);
+            }
+
         }
-        System.out.println("Finish "+id);
+        List<Comment> replies = comments.parallelStream().filter(element -> element.getReply_comment_total() > 0).collect(Collectors.toList());
+        Map<Long, List<Comment>> result = new HashMap<>();
+        List<Comment> temp = getCommentsReply(id, replies, driver);
+        for (Comment c: temp){
+            long cid = c.getReply_id();
+            if (result.containsKey(cid)){
+                result.get(cid).add(c);
+            }
+            else{
+                List<Comment> key = new ArrayList<>();
+                key.add(c);
+                result.put(cid, key);
+            }
+        }
+        for (int i=0;i<comments.size();i++){
+            Comment c = comments.get(i);
+            if (result.containsKey(c.getCid())){
+                c.setReplies(result.get(c.getCid()));
+            }
+            comments.set(i, c);
+
+        }
         return comments;
     }
 
-    public static List<Comment> getCommentsReply(String videoId, Comment comment, WebDriver driver) throws IOException, InvalidAlgorithmParameterException, NoSuchPaddingException, IllegalBlockSizeException, NoSuchAlgorithmException, BadPaddingException, InvalidKeyException, IllegalAccessException, InterruptedException {
+    public static List<Comment> getCommentsReply(String videoId, List<Comment> replyComment, WebDriver driver) throws IOException, InvalidAlgorithmParameterException, NoSuchPaddingException, IllegalBlockSizeException, NoSuchAlgorithmException, BadPaddingException, InvalidKeyException, IllegalAccessException, InterruptedException {
         List<Comment> comments = new ArrayList<>();
+        System.out.println("Start reply video: "+ videoId);
         String userAgent = getUserAgent(driver);
-        int cursor = 0;
-        int hasMore = 0;
-        ObjectMapper oMapper = new ObjectMapper();
-        do {
-            ReplyCommentHeader requestHeader = new ReplyCommentHeader(userAgent, cursor, comment.getCid(), videoId);
-            TiktokRequest<ReplyCommentHeader> tiktokRequest = new TiktokRequest<>(requestHeader);
-            Object itemVideos = tiktokRequest.excuse(driver, URL_REPLY_LIST, false);
-            String json = oMapper.writeValueAsString(itemVideos);
-            List<Comment> result = JsonUtil.parseJsonComment(json);
-            JsonNode videoResult = oMapper.readValue(json, JsonNode.class);
-            hasMore = videoResult.get("has_more").intValue();
-            if (hasMore == 1) {
-                cursor = videoResult.get("cursor").intValue();
-            }
-            if (result != null) {
-                comments.addAll(result);
-            }
-            Thread.sleep(350);
-        } while (hasMore == 1);
+        List<String> params = TiktokRequest.generateReplyFromComment(replyComment, getRandomUserAgent(), videoId);
+        for (String p: params){
+            Object object = excuseMultiFetch(p,driver);
+            List<Comment> temp = parseJsonComment(object);
+            Thread.sleep(3500);
+            comments.addAll(temp);
+        }
         return comments;
     }
 
@@ -219,7 +214,9 @@ public class TikTokAPI {
             if (result != null) {
                 videos.addAll(result);
             }
+            Thread.sleep(450);
         } while (hasMore);
+
         return videos;
     }
 

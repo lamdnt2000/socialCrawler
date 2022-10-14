@@ -7,20 +7,17 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class FileUtil {
-    public static List<String> readIds() throws IOException {
+    public static List<String> readUsers() throws IOException {
         FileReader fileReader = new FileReader("ids.txt");
-        List<String> ids = new ArrayList<>();
+        List<String> users = new ArrayList<>();
         try (BufferedReader bufferedReader = new BufferedReader(fileReader)) {
             String line = "";
 
             while ((line=bufferedReader.readLine())!=null){
-                String privateKey = line.trim();
-                if (line.startsWith("0x")){
-                    privateKey=line.subSequence(2, privateKey.length()).toString();
-                }
-                ids.add(privateKey);
+                String user = line.trim();
+                users.add(user);
             }
         }
-        return ids;
+        return users;
     }
 }

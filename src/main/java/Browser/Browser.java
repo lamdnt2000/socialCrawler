@@ -38,7 +38,7 @@ public class Browser {
 
     public WebDriver initBrowser(boolean isMobile){
         System.setProperty("webdriver.chrome.driver", "chromedriver.exe");
-        ChromeOptions chromeOptions = optionsSetting(true, isMobile);
+        ChromeOptions chromeOptions = optionsSetting(false, isMobile);
         WebDriver driver = new ChromeDriver(chromeOptions);
         driver.manage().deleteAllCookies();
         driver.manage().window().setSize(new Dimension(280,840));
