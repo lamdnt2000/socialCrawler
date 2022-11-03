@@ -20,22 +20,29 @@ public class CommonUtil {
 
     public static String convertObjectToJson(Object object) throws IllegalAccessException, JsonProcessingException {
         mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
-        return mapper.writeValueAsString(object).replaceAll("\\\\","").replaceAll("\"\\{","\\{").replaceAll("\\}\"","\\}");
+        return mapper.writeValueAsString(object).replaceAll("\\\\", "").replaceAll("\"\\{", "\\{").replaceAll("\\}\"", "\\}");
 
     }
 
 
-    public static long parseStringToLong(String text){
+    public static long parseStringToLong(String text) {
         Pattern pattern = Pattern.compile("(\\d{1,3},)?(\\d{1,3},)?(\\d{1,3},)?(\\d{1,3},)?\\d{1,3}");
         Matcher matcher = pattern.matcher(text);
-        if (matcher.find()){
-            return Long.parseLong(matcher.group().replaceAll(",",""));
+        int multiple = 1;
+        if (text.toLowerCase().endsWith("k")) {
+            multiple = 1000;
         }
-        else{
+        if (matcher.find()) {
+            return Long.parseLong(matcher.group().replaceAll(",", "")) * multiple;
+        } else {
             return 0;
         }
     }
 
+    public static String parseUrlGetVideoId(String url) {
+        int index = url.lastIndexOf("/");
+        return url.substring(index + 1);
+    }
 
 
 }

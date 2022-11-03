@@ -2,8 +2,10 @@ package TikTok;
 
 import TikTok.Header.BaseHeader;
 import TikTok.Header.CommentHeader;
+import TikTok.Header.ItemListHeader;
 import TikTok.Header.ReplyCommentHeader;
 import TikTok.Model.Comment;
+import Youtube.Header.VideoHeader;
 import lombok.Getter;
 import org.openqa.selenium.JavascriptException;
 import org.openqa.selenium.JavascriptExecutor;
@@ -17,8 +19,7 @@ import javax.crypto.NoSuchPaddingException;
 import static TikTok.CommonUtil.*;
 import static TikTok.AESUtil.*;
 import static TikTok.CommonUtil.convertObjectToPara;
-import static TikTok.TiktokConstants.URL_COMMENT_LIST;
-import static TikTok.TiktokConstants.URL_REPLY_LIST;
+import static TikTok.TiktokConstants.*;
 
 import java.io.UnsupportedEncodingException;
 import java.security.InvalidAlgorithmParameterException;
@@ -87,6 +88,43 @@ public class TiktokRequest<T extends BaseHeader> {
                                 "            \"credentials\": \"include\"\n" +
                                 "            }).then(response => response.json())" +
                                 "    .catch(error => console.warn(error))", param);
+                list.add(js);
+                cursor+=count;
+                if (cursor>=total){
+                    break;
+                }
+            }
+            params.add("var data = await Promise.all([" + String.join(",", list) + "]);return data");
+        }
+
+        return params ;
+    }
+
+    public List<String> bulkVideoRequest(long total, int count) throws IllegalAccessException, InvalidAlgorithmParameterException, NoSuchPaddingException, UnsupportedEncodingException, IllegalBlockSizeException, NoSuchAlgorithmException, BadPaddingException, InvalidKeyException {
+
+        double max = Math.ceil((float)total/500);
+        int cursor = 0;
+        List<String> params = new ArrayList<>();
+        for (int i=0;i<max;i++){
+            List<String> list = new ArrayList<>();
+            for (int j=0;j<(500/count);j++){
+                ItemListHeader head = (ItemListHeader) this.requestHeader;
+                head.setCursor(cursor);
+                String param = convertObjectToPara(head);
+                String ttParam = "\"x-tt-params\":\"" + encrypt(param) + "\"\n";
+                String js = String.format(
+                        "fetch(\"" + URL_ITEM_LIST + "?%s\", {\n" +
+                                "            \"headers\": {\n" +
+                                "                \"accept\": \"*/*\",\n" +
+                                "                %s" +
+                                "            },\n" +
+                                "            \"referrerPolicy\": \"strict-origin-when-cross-origin\",\n" +
+                                "            \"body\": null,\n" +
+                                "            \"method\": \"GET\",\n" +
+                                "            \"mode\": \"cors\",\n" +
+                                "            \"credentials\": \"include\"\n" +
+                                "            }).then(response => response.json())" +
+                                "    .catch(error => console.warn(error))", param, ttParam);
                 list.add(js);
                 cursor+=count;
                 if (cursor>=total){

@@ -15,12 +15,18 @@ import static TikTok.TiktokRequest.generateReplyFromComment;
 
 public class JsonUtil {
     public static ObjectMapper mapper = new ObjectMapper();
-    public static List<Video> parseJsonVideo(String json) throws IOException {
+    public static List<Video> parseJsonVideo(Object objs) throws IOException {
         mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
-        JsonNode node = mapper.readValue(json, JsonNode.class);
-        json = mapper.writeValueAsString(node.get("itemList"));
-        Video[] videoList = mapper.readValue(json, Video[].class);
-        return Arrays.asList(videoList);
+        String json = mapper.writeValueAsString(objs);
+        JsonNode[] nodes = mapper.readValue(json, JsonNode[].class);
+        List<Video> videos = new ArrayList<>();
+        for (JsonNode node: nodes){
+            json = mapper.writeValueAsString(node.get("itemList"));
+            Video[] videoList = mapper.readValue(json, Video[].class);
+            videos.addAll(Arrays.asList(videoList));
+        }
+
+        return videos;
     }
 
     public static Profile parseJsonInfo(String json, String username) throws IOException {

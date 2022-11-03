@@ -2,76 +2,50 @@ package Facebook;
 
 import Facebook.Model.ModPage;
 import Facebook.Model.ModPost;
-import com.fasterxml.jackson.annotation.JsonInclude;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.restfb.*;
-import com.restfb.types.*;
-import org.apache.commons.lang3.reflect.FieldUtils;
 
-import java.io.FileWriter;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 
 import static Facebook.Constants.FacebookConstants.*;
+import static Util.FileUtils.readUsers;
+import static Util.FileUtils.saveData;
 
 public class DemoFacebookAPI {
-    public static String ACCESS_TOKEN = "";
-    public static String COOKIE = "";
+    public static String ACCESS_TOKEN = "EAAGNO4a7r2wBAGy2EpCZC1fgHKknoDmamu3OwDOwrpFfeKOy6OzrThyjKcatR7EhusStYAcHSufwdH7FKVsIgqJpjsvB33kH6dZAX7BXbmjCtZCBo83WpMEVJy3YhZCTXuseVZCOXJzYOBXuSQZCbVKBZCsZB5PX2IXgY4b8JvCm6juMj8EQMv4hVMGT7aAP9WIZD";
+    public static String COOKIE = "c_user=100004437857217;xs=1%3A_fZxa0MTsLDylQ%3A2%3A1665643055%3A-1%3A6154%3A%3AAcUdnFhUxspQJvIcTtPzVwyFQ3bi90uy26OLsaJhOAgv;";
+
     public static void main(String[] args) throws IOException, IllegalAccessException {
         ModWebRequestor modWebRequestor = new ModWebRequestor(COOKIE);
-        FacebookClient client = new DefaultFacebookClient(ACCESS_TOKEN,modWebRequestor, new DefaultJsonMapper(),Version.VERSION_4_0);
-        ModPage page = client.fetchObject("1306924079365589",ModPage.class,Parameter.with("fields",FACEBOOK_FETCH_PAGE_PARAM));
+        FacebookClient client = new DefaultFacebookClient(ACCESS_TOKEN, modWebRequestor, new DefaultJsonMapper(), Version.VERSION_4_0);
+        List<String> ids = readUsers();
+        for (String id : ids) {
+            try{
+                String pageId = id;
+                ModPage page = client.fetchObject(pageId, ModPage.class, Parameter.with("fields", FACEBOOK_FETCH_PAGE_PARAM));
 
-        Connection<ModPost> post = client.fetchConnection("1306924079365589/"+FACEBOOK_FETCH_POST,ModPost.class);
-        Iterator<List<ModPost>> result = post.iterator();
-        List<ModPost> postList = result.next();
-
-        for (int i=0;i< postList.size();i++){
-            ModPost modPost = postList.get(i);
-            Connection<Comment> commentsConnection = client.fetchConnection(modPost.getId() + "/" + FACEBOOK_FETCH_COMMENT, Comment.class, Parameter.with("limit", FACEBOOK_MAX_LIMIT_COMMENT));
-            Iterator<List<Comment>> next = commentsConnection.iterator();
-            List<Comment> commentList = new ArrayList<>();
-            while (next.hasNext()) {
-                List<Comment> comments = next.next();
-                // This is the same functionality as the example above
-                commentList.addAll(comments);
-                if (!commentsConnection.hasNext()) {
-                    break;
+                Connection<ModPost> posts = client.fetchConnection(pageId + "/" + FACEBOOK_FETCH_POST, ModPost.class, Parameter.with("limit", FACEBOOK_MAX_LIMIT_POST));
+                Iterator<List<ModPost>> it = posts.iterator();
+                List<ModPost> postIds = new ArrayList<>();
+                while (it.hasNext()) {
+                    List<ModPost> myfeed = it.next();
+                    postIds.addAll(myfeed);
+                    System.out.println(postIds.size());
+                    if (!posts.hasNext()) {
+                        break;
+                    }
                 }
+                page.setPostList(postIds);
+                saveData("C:\\tool\\FacebookAPI\\facebook\\",id, page);
+
             }
-            Comments pComments = modPost.getComments();
-            FieldUtils.writeField(pComments,"data",commentList,true);
+            catch (Exception e){
+                System.out.println(id);
+            }
 
         }
-        page.setPostList(postList);
-        ObjectMapper obj = new ObjectMapper();
-        obj.setSerializationInclusion(JsonInclude.Include.NON_NULL);
-        FileWriter file = new FileWriter("output.json");
-        file.write(obj.writeValueAsString(page));
-        file.close();
-        /*Connection<Post> posts = client.fetchConnection("RioXmusic/"+FACEBOOK_FETCH_PAGE, Post.class, Parameter.with("limit",FACEBOOK_MAX_LIMIT_POST));
-        Iterator<List<Post>> it = posts.iterator();
-        int totalPost = 0;
-        List<Post> postIds = new ArrayList<>();
-        while (it.hasNext()){
-            List<Post> myfeed = it.next();
-           postIds.addAll(myfeed);
-            System.out.println(postIds.size());
-            if (!posts.hasNext()){
-                break;
-            }
-        }
-        for (Post p: postIds){
-            System.out.println(p.getId());
-        }
-        List<String> ids = readIds();
-        for (int i=0;i<1;i++){
-            List<String> idsTen = ids.subList(i*10,(i+1)*10);
-            JsonObject fetchObjectsResults = client.fetchObjects(idsTen, JsonObject.class, Parameter.with("fields","comments.limit(500)"));
-            System.out.println(fetchObjectsResults.toString());
-        }*/
 
 
     }
