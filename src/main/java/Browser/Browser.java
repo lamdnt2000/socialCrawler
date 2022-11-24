@@ -36,9 +36,9 @@ public class Browser {
         return chromeOptions;
     }
 
-    public WebDriver initBrowser(boolean isMobile){
+    public WebDriver initBrowser(boolean isMobile, boolean isHeaddless){
         System.setProperty("webdriver.chrome.driver", "chromedriver.exe");
-        ChromeOptions chromeOptions = optionsSetting(false, isMobile);
+        ChromeOptions chromeOptions = optionsSetting(isHeaddless, isMobile);
         WebDriver driver = new ChromeDriver(chromeOptions);
         driver.manage().deleteAllCookies();
         driver.manage().window().setSize(new Dimension(280,840));
