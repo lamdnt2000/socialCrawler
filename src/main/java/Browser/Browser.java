@@ -1,6 +1,5 @@
 package Browser;
 
-import org.openqa.selenium.Cookie;
 import org.openqa.selenium.Dimension;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.chrome.ChromeDriver;
@@ -28,6 +27,13 @@ public class Browser {
         this.userAgent = RandomUserAgent.getRandomUserAgent();
         chromeOptions.addArguments("--user-agent="+this.userAgent);
         chromeOptions.addArguments("disable-infobars");
+
+        chromeOptions.addArguments("--no-sandbox");
+        chromeOptions.addArguments("--disable-dev-shm-usage");
+        chromeOptions.addArguments("--disable-browser-side-navigation");
+        chromeOptions.addArguments("--disable-gpu");
+
+
         if (isMobile){
             Map<String, String> mobileEmulation = new HashMap<>();
             mobileEmulation.put("deviceName", "Galaxy S9+");

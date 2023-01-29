@@ -1,8 +1,10 @@
 package TikTokService;
 
-import TikTokService.Header.*;
+import TikTokService.Header.ChallegeHeader;
+import TikTokService.Header.CommentHeader;
+import TikTokService.Header.DiscoverHeader;
+import TikTokService.Header.ItemListHeader;
 import TikTokService.Model.*;
-import TikTokService.Thread.FetchComment;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -20,7 +22,6 @@ import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
 import java.time.Duration;
 import java.util.*;
-import java.util.concurrent.*;
 import java.util.stream.Collectors;
 
 import static Browser.RandomUserAgent.getRandomUserAgent;
@@ -34,46 +35,63 @@ public class TikTokAPI {
     public static Profile userData;
     public static List<WebDriver> drivers = new ArrayList<>();
     public static boolean IS_FETCH_COMMENT = false;
-    public static String verifyFp ;
-    public static Profile getUserProfile(String username, WebDriver driver) throws IOException, InterruptedException {
+    public static String verifyFp;
+
+    public static Profile getUserProfile(String username, WebDriver driver) throws Exception {
         driver.get("https://tiktok.com/@" + username);
+
+        driver.navigate().refresh();
         boolean isCaptcha = isCaptcha(driver);
-        if (isCaptcha){
+        if (isCaptcha) {
             do {
+
                 CaptchaResolver(driver);
-                Thread.sleep(500);
+                Thread.sleep(2000);
+                isCaptcha = isCaptcha(driver);
             }
-            while (isCaptcha(driver));
+            while (isCaptcha);
+        }
+        else{
+            throw  new Exception("By pass captcha failed");
         }
         GetVerifyFp(driver);
-        ObjectMapper oMapper = new ObjectMapper();
+
         Object basicObject = ((JavascriptExecutor) driver).executeScript("return JSON.parse(document.getElementById('SIGI_STATE').text).UserModule");
-        String json = oMapper.writeValueAsString(basicObject);
-        return parseJsonInfo(json, username);
+
+        return parseJsonInfo(basicObject, username);
 
     }
 
-    public static Profile getUserFeed(String username, WebDriver driver) throws IOException, InvalidAlgorithmParameterException, NoSuchPaddingException, IllegalBlockSizeException, NoSuchAlgorithmException, BadPaddingException, InvalidKeyException, IllegalAccessException, InterruptedException, ExecutionException {
+    public static Profile getUserFeed(String username, WebDriver driver) throws Exception {
         Profile user = getUserProfile(username, driver);
         long cursor = 0;
         boolean hasMore = false;
-        List<Video> videoList = new ArrayList<>();
+
         String userAgent = getUserAgent(driver);
 
+        List<Object> fetch = new ArrayList<>();
+        ThreadLocal<List<Object>> tFetch = new ThreadLocal<>();
+        tFetch.set(fetch);
 
         do {
             ItemListHeader requestHeader = new ItemListHeader(userAgent, user.getSecUid(), cursor, user.getId(), verifyFp);
             TiktokRequest tiktokRequest = new TiktokRequest(requestHeader);
             Object itemVideos = tiktokRequest.excuse(driver, URL_ITEM_LIST, true);
-            List<Video> result = JsonUtil.parseJsonVideo(itemVideos);
+            fetch.add(itemVideos);
+
             JsonNode videoResult = mapper.readValue(mapper.writeValueAsString(itemVideos), JsonNode.class);
             hasMore = videoResult.get("hasMore").booleanValue();
             if (hasMore) {
                 cursor = Long.parseLong(videoResult.get("cursor").textValue());
             }
-            videoList.addAll(result);
+
         } while (hasMore);
 
+
+        List<Video> result = JsonUtil.parseJsonVideo(fetch);
+
+        user.setVideos(result);
+        tFetch.remove();
        /* Thread.sleep(450);
         List<Future<Video>> futuresItem = new ArrayList<>();
         ExecutorService exService = new ThreadPoolExecutor(
@@ -97,7 +115,7 @@ public class TikTokAPI {
             videos.add(v);
         }
         exService.shutdown();*/
-        user.setVideos(videoList);
+
 
         return user;
     }
@@ -204,7 +222,7 @@ public class TikTokAPI {
         return challenges;
     }
 
-    public static List<Video> getVideoByHashtag(ChallengeSearch challenge, WebDriver driver) throws IOException, InvalidAlgorithmParameterException, NoSuchPaddingException, IllegalBlockSizeException, NoSuchAlgorithmException, BadPaddingException, InvalidKeyException, IllegalAccessException, InterruptedException {
+    /*public static List<Video> getVideoByHashtag(ChallengeSearch challenge, WebDriver driver) throws IOException, InvalidAlgorithmParameterException, NoSuchPaddingException, IllegalBlockSizeException, NoSuchAlgorithmException, BadPaddingException, InvalidKeyException, IllegalAccessException, InterruptedException {
         String title = challenge.getTitle();
         driver.get(String.format("https://www.tiktok.com/tag/%s?lang=en", title));
         ObjectMapper oMapper = new ObjectMapper();
@@ -232,54 +250,58 @@ public class TikTokAPI {
 
         return videos;
     }
-
+*/
     public static String getUserAgent(WebDriver driver) {
         return (String) ((JavascriptExecutor) driver).executeScript("return navigator.userAgent");
     }
 
-    public static boolean isCaptcha(WebDriver driver){
+    public static boolean isCaptcha(WebDriver driver) {
         try {
-            WebDriverWait wait = new WebDriverWait(driver, 5);
-            wait.until(ExpectedConditions.presenceOfElementLocated(By.xpath("//*[@id=\"tiktok-verify-ele\"]/div/div[2]/img[2]")));
+            WebDriverWait wait = new WebDriverWait(driver, 2);
+            wait.until(ExpectedConditions.presenceOfElementLocated(By.xpath("//*[@id=\"tiktok-verify-ele\"]/div/div[2]/img[1]")));
             return true;
-        } catch (Exception e){
+        } catch (Exception e) {
+            System.out.println("Captcha not found");
             return false;
         }
 
     }
 
-    public static void GetVerifyFp(WebDriver driver){
+    public static void GetVerifyFp(WebDriver driver) {
         Cookie cookie = driver.manage().getCookieNamed("s_v_web_id");
-        verifyFp = cookie.getValue();
+        if (cookie != null) {
+            verifyFp = cookie.getValue();
+        }
+
     }
 
     public static void CaptchaResolver(WebDriver driver) throws IOException, InterruptedException {
         WebElement inner = driver.findElement(By.xpath("//*[@id=\"tiktok-verify-ele\"]/div/div[2]/img[2]"));
         WebElement outer = driver.findElement(By.xpath("//*[@id=\"tiktok-verify-ele\"]/div/div[2]/img[1]"));
         String srcInner = parseUrlToBase64(inner.getAttribute("src"));
+
         String srcOuter = parseUrlToBase64(outer.getAttribute("src"));
         WebElement handler = driver.findElement(By.xpath("//*[@id=\"secsdk-captcha-drag-wrapper\"]/div[2]"));
         Random random = new Random();
         int result = bypassCaptcha(srcInner, srcOuter);
         int px = result / 6;
-        new Actions(driver).contextClick().
+        new Actions(driver).
                 clickAndHold(handler)
-                .pause(Duration.ofMillis(random.longs(300, 1000).findFirst().getAsLong()))
+                .pause(Duration.ofMillis(random.longs(350, 600).findFirst().getAsLong()))
                 .moveByOffset(px, 0)
-                .pause(Duration.ofMillis(random.longs(300, 1000).findFirst().getAsLong()))
+                .pause(Duration.ofMillis(random.longs(350, 600).findFirst().getAsLong()))
                 .moveByOffset(px, 0)
-                .pause(Duration.ofMillis(random.longs(300, 1000).findFirst().getAsLong()))
+                .pause(Duration.ofMillis(random.longs(350, 600).findFirst().getAsLong()))
                 .moveByOffset(px, 0)
-                .pause(Duration.ofMillis(random.longs(300, 1000).findFirst().getAsLong()))
+                .pause(Duration.ofMillis(random.longs(350, 600).findFirst().getAsLong()))
                 .moveByOffset(px, 0)
-                .pause(Duration.ofMillis(random.longs(300, 1000).findFirst().getAsLong()))
+                .pause(Duration.ofMillis(random.longs(350, 600).findFirst().getAsLong()))
                 .moveByOffset(px, 0).
-                pause(Duration.ofMillis(random.longs(300, 1000).findFirst().getAsLong()))
-                .moveByOffset(px, 0)
+                pause(Duration.ofMillis(random.longs(350, 600).findFirst().getAsLong()))
+                .moveByOffset(px, 0).
+                pause(Duration.ofMillis(random.longs(350, 600).findFirst().getAsLong()))
                 .release().perform();
-        Thread.sleep(1000);
     }
-
 
 
 }

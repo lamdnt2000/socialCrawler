@@ -1,12 +1,11 @@
 package TikTokService.Model;
 
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
-import lombok.ToString;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import lombok.*;
 
 import java.io.Serializable;
 @Getter@Setter@ToString@NoArgsConstructor
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class VideoExtra implements Serializable {
     private String cover;
     private int height;

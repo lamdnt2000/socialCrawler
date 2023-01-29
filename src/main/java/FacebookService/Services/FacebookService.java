@@ -19,9 +19,9 @@ public class FacebookService {
         return client.fetchObject(uid, ModPage.class, Parameter.with("fields", FACEBOOK_FETCH_PAGE_PARAM));
     }
 
-    public FacebookService() {
-        ModWebRequestor modWebRequestor = new ModWebRequestor(COOKIE);
-        client = new DefaultFacebookClient(ACCESS_TOKEN, modWebRequestor, new DefaultJsonMapper(), Version.VERSION_4_0);
+    public FacebookService(String cookie, String accessToken) {
+        ModWebRequestor modWebRequestor = new ModWebRequestor(cookie, USER_AGENT);
+        client = new DefaultFacebookClient(accessToken, modWebRequestor, new DefaultJsonMapper(), Version.VERSION_4_0);
 
     }
 

@@ -2,62 +2,106 @@ package TikTokService;
 
 import TikTokService.Model.*;
 import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.*;
-import org.openqa.selenium.By;
-import org.openqa.selenium.WebDriver;
-import org.openqa.selenium.WebElement;
-import org.openqa.selenium.interactions.Actions;
-import org.openqa.selenium.support.ui.ExpectedConditions;
-import org.openqa.selenium.support.ui.WebDriverWait;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.jayway.jsonpath.Configuration;
+import com.jayway.jsonpath.JsonPath;
+import com.jayway.jsonpath.Option;
+import com.jayway.jsonpath.TypeRef;
+import com.jayway.jsonpath.spi.json.JacksonJsonProvider;
+import com.jayway.jsonpath.spi.json.JsonProvider;
+import com.jayway.jsonpath.spi.mapper.JacksonMappingProvider;
+import com.jayway.jsonpath.spi.mapper.MappingProvider;
 
-import java.io.File;
 import java.io.IOException;
-import java.time.Duration;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Random;
-
-import static Util.CommonUtil.parseUrlToBase64;
-import static Util.RequestUtil.bypassCaptcha;
+import java.util.*;
 
 public class JsonUtil {
-    public static ObjectMapper mapper = new ObjectMapper();
-    public static List<Video> parseJsonVideo(Object objs) throws IOException {
-        mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
-        String json = mapper.writeValueAsString(objs);
-        JsonNode node = mapper.readValue(json, JsonNode.class);
-        return mapper.readValue(mapper.writeValueAsString(node.get("itemList")), new TypeReference<List<Video>>() {
+    public static ObjectMapper mapper = new ObjectMapper().configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+    // JsonPathCompiler.compile("$[*].itemList[*]['secret', 'desc', 'textExtra', 'comments', 'createTime', 'id', 'categories', 'stats', 'video']");
+    public static List<Video> parseJsonVideo(List<Object> objs) throws IOException {
+        ThreadLocal<Object> tObject = new ThreadLocal<>();
+        Configuration.setDefaults(new Configuration.Defaults() {
+
+            private final JsonProvider jsonProvider = new JacksonJsonProvider();
+            private final MappingProvider mappingProvider = new JacksonMappingProvider();
+
+            @Override
+            public JsonProvider jsonProvider() {
+                return jsonProvider;
+            }
+
+            @Override
+            public MappingProvider mappingProvider() {
+                return mappingProvider;
+            }
+
+            @Override
+            public Set<Option> options() {
+                return EnumSet.noneOf(Option.class);
+            }
         });
+        tObject.set(objs);
+        try {
+
+            List<Video> videos = JsonPath.parse(mapper.writeValueAsString(objs)).read("$[*].itemList[*]", new TypeRef<List<Video>>() {});
+
+
+
+            return videos;
+        }
+        finally {
+            tObject.remove();
+
+        }
     }
 
-    public static Profile parseJsonInfo(String json, String username) throws IOException {
-        mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)   ;
-        JsonNode jsonNode = mapper.readValue(json,JsonNode.class);
-        Profile user = mapper.readValue(mapper.writeValueAsString(jsonNode.get("users").get(username)), Profile.class);
-        UserStats stats = mapper.readValue(mapper.writeValueAsString(jsonNode.get("stats").get(username)),UserStats.class);
-        user.setStats(stats);
-        return user;
+    public static Profile parseJsonInfo(Object object, String username) throws IOException {
+        ThreadLocal<Object> tObject = new ThreadLocal<>();
+        tObject.set(object);
+        String json = mapper.writeValueAsString(object);
+        ThreadLocal<String> tJson = new ThreadLocal<>();
+        tJson.set(json);
+        try {
+            JsonNode jsonNode = mapper.readValue(json, JsonNode.class);
+            Profile user = mapper.readValue(mapper.writeValueAsString(jsonNode.get("users").get(username)), Profile.class);
+            UserStats stats = mapper.readValue(mapper.writeValueAsString(jsonNode.get("stats").get(username)), UserStats.class);
+            user.setStats(stats);
+            return user;
+        }
+        finally {
+            tObject.remove();
+            tJson.remove();
+        }
     }
 
     public static List<Comment> parseJsonComment(Object obj) throws IOException {
-        mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
-        String json = mapper.writeValueAsString(obj);
-        JsonNode[] nodes = mapper.readValue(json, JsonNode[].class);
-        List<Comment> comments = new ArrayList<>();
-        for (JsonNode node: nodes){
-            if (node.get("comments").size()>0){
-                String jsonItem = mapper.writeValueAsString(node.get("comments"));
-                Comment[] result  = mapper.readValue(jsonItem, Comment[].class);
-                comments.addAll(Arrays.asList(result));
+        ThreadLocal<Object> tObject = new ThreadLocal<>();
+        ThreadLocal<JsonNode[]> tNodes = new ThreadLocal<>();
+        tObject.set(obj);
+
+        JsonNode[] nodes = mapper.readValue(mapper.writeValueAsString(obj), JsonNode[].class);
+        tNodes.set(nodes);
+        try {
+            List<Comment> comments = new ArrayList<>();
+            for (JsonNode node : nodes) {
+                if (node.get("comments").size() > 0) {
+                    String jsonItem = mapper.writeValueAsString(node.get("comments"));
+                    Comment[] result = mapper.readValue(jsonItem, Comment[].class);
+                    comments.addAll(Arrays.asList(result));
+                }
             }
+            return comments;
         }
-        return comments;
+        finally {
+            tObject.remove();
+            tNodes.remove();
+        }
     }
 
     public static List<Discover> parseJsonDiscorver(String json) throws IOException {
-        mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
-         JsonNode node = mapper.readValue(json, JsonNode.class);
+        JsonNode node = mapper.readValue(json, JsonNode.class);
         String jsonItem = mapper.writeValueAsString(node.get("body"));
         JsonNode[] comments  = mapper.readValue(jsonItem, JsonNode[].class);
         List<Discover<UserDiscover>> users = mapper.readValue(mapper.writeValueAsString(comments[0].get("exploreList")), new TypeReference<List<Discover<UserDiscover>>>(){});
@@ -73,7 +117,6 @@ public class JsonUtil {
     }
 
     public static List<ChallengeSearch> parseJsonChallege(String json) throws IOException {
-        mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
         JsonNode node = mapper.readValue(json, JsonNode.class);
         String jsonItem = mapper.writeValueAsString(node.get("challengeInfoList"));
         System.out.println(jsonItem);

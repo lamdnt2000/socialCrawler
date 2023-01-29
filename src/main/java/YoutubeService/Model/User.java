@@ -22,6 +22,7 @@ public class User implements Serializable {
     private String title;
     private List<String> tags;
     private String description;
+    private String username;
     private String published;
     private String countryCode;
     private List<Video> videos;

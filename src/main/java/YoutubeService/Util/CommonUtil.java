@@ -20,7 +20,7 @@ public class CommonUtil {
 
 
     public static long parseStringToLong(String text) {
-        Pattern pattern = Pattern.compile("(\\d{1,3},)?(\\d{1,3},)?(\\d{1,3},)?(\\d{1,3},)?\\d{1,3}");
+        Pattern pattern = Pattern.compile("(\\d+,)?(\\d+,)?(\\d+,)?(\\d+,)?\\d+");
         Matcher matcher = pattern.matcher(text);
         int multiple = 1;
         if (text.toLowerCase().endsWith("k")||text.toLowerCase().endsWith("N")) {

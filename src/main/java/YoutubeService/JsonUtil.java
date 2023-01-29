@@ -1,7 +1,5 @@
 package YoutubeService;
 
-import Util.FileUtils;
-import YoutubeService.Model.Category;
 import YoutubeService.Model.Reaction;
 import YoutubeService.Model.User;
 import YoutubeService.Model.Video;
@@ -10,9 +8,13 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.jayway.jsonpath.*;
-import com.jayway.jsonpath.spi.json.JacksonJsonProvider;
-import com.jayway.jsonpath.spi.mapper.JacksonMappingProvider;
+import org.jsfr.json.Collector;
+import org.jsfr.json.JacksonParser;
+import org.jsfr.json.JsonSurfer;
+import org.jsfr.json.ValueBox;
+import org.jsfr.json.compiler.JsonPathCompiler;
+import org.jsfr.json.path.JsonPath;
+import org.jsfr.json.provider.JacksonProvider;
 import org.w3c.dom.Document;
 import org.xml.sax.SAXException;
 
@@ -20,45 +22,74 @@ import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
 import javax.xml.xpath.*;
-import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Iterator;
+import java.util.List;
 
 public class JsonUtil {
     public static ObjectMapper mapper = new ObjectMapper().configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
     ;
-    public static ParseContext jsonPath = JsonPath.using(
-            Configuration.builder()
-                    .jsonProvider(new JacksonJsonProvider(mapper))
-                    .mappingProvider(new JacksonMappingProvider(mapper))
-                    .build()
-    );
+    public static JsonPath surferVideoDetail = JsonPathCompiler.compile("$.*");
+    public static JsonPath surferVideoReaction = JsonPathCompiler.compile("$.*");
+    public static JsonSurfer surfer = new JsonSurfer(JacksonParser.INSTANCE, JacksonProvider.INSTANCE);
+    public static JsonPath avataroDetail =
+            JsonPathCompiler.compile("$.*.header.c4TabbedHeaderRenderer.avatar.thumbnails[2].url");
+
 
     public static User parseUser(Object object) throws IOException, XPathExpressionException, ParserConfigurationException, SAXException {
-        String json = mapper.writeValueAsString(object);
-        JsonNode node = mapper.readValue(json, JsonNode.class);
-        JsonNode user = node.get("header").get("c4TabbedHeaderRenderer");
-        String thumbnail = user.get("avatar").get("thumbnails").get(2).get("url").textValue();
-        String userType = "";
-        if (user.has("badges")) {
-            userType = user.get("badges").get(0).get("metadataBadgeRenderer").get("tooltip").textValue();
+
+
+        ThreadLocal<Object> tobject = new ThreadLocal<>();
+        ThreadLocal<JsonNode> tnode = new ThreadLocal<>();
+        try {
+            tobject.set(object);
+            String json = mapper.writeValueAsString(object);
+
+
+            JsonNode node = mapper.readValue(json, JsonNode.class);
+
+            tnode.set(node);
+            JsonNode user = node.get("header").get("c4TabbedHeaderRenderer");
+            String thumbnail = user.get("avatar").get("thumbnails").get(2).get("url").textValue();
+            String userType = "";
+            if (user.has("badges")) {
+                userType = user.get("badges").get(0).get("metadataBadgeRenderer").get("tooltip").textValue();
+            }
+            String banner = user.get("banner").get("thumbnails").get(0).get("url").textValue();
+            String channelId = user.get("channelId").textValue();
+
+            String browseId = user.get("navigationEndpoint").get("browseEndpoint").get("browseId").textValue();
+            String subscriber = user.get("subscriberCountText").get("simpleText").textValue();
+            String title = user.get("title").textValue();
+            String published = parsePublishedDate(channelId);
+            JsonNode meta = node.get("microformat").get("microformatDataRenderer");
+            User result = new User(thumbnail, userType, banner, channelId, browseId, subscriber, title, published);
+            if (user.has("channelHandleText")) {
+                JsonNode userNode = user.get("channelHandleText");
+                if (userNode.has("runs")) {
+                    userNode = userNode.get("runs");
+                    if (userNode.has(0)) {
+                        userNode = userNode.get(0).get("text");
+                        String username = userNode.textValue();
+                        result.setUsername(username);
+                    }
+                }
+            }
+
+            result.setDescription(meta.get("description").textValue());
+            List<String> tags = mapper.readValue(mapper.writeValueAsString(meta.get("tags")), new TypeReference<List<String>>() {
+            });
+            result.setTags(tags);
+            result.setCountryCode(node.get("topbar").get("desktopTopbarRenderer").get("countryCode").textValue());
+            return result;
+        } finally {
+            tobject.remove();
+            tnode.remove();
         }
-        String banner = user.get("banner").get("thumbnails").get(0).get("url").textValue();
-        String channelId = user.get("channelId").textValue();
-        String browseId = user.get("navigationEndpoint").get("browseEndpoint").get("browseId").textValue();
-        String subscriber = user.get("subscriberCountText").get("simpleText").textValue();
-        String title = user.get("title").textValue();
-        String published = parsePublishedDate(channelId);
-        JsonNode meta = node.get("microformat").get("microformatDataRenderer");
-        User result = new User(thumbnail, userType, banner, channelId, browseId, subscriber, title, published);
-        result.setDescription(meta.get("description").textValue());
-        List<String> tags = mapper.readValue(mapper.writeValueAsString(meta.get("tags")), new TypeReference<List<String>>() {
-        });
-        result.setTags(tags);
-        result.setCountryCode(node.get("topbar").get("desktopTopbarRenderer").get("countryCode").textValue());
-        return result;
     }
 
     public static String parsePublishedDate(String channelId) throws IOException, ParserConfigurationException, SAXException, XPathExpressionException {
@@ -74,48 +105,57 @@ public class JsonUtil {
     }
 
     public static String parseVideoList(Object object, List<String> ids) throws JsonProcessingException {
-        DocumentContext context = jsonPath.parse(object);
-        JsonNode node = context.read("$.onResponseReceivedActions[0].appendContinuationItemsAction." +
-                "continuationItems[0]",JsonNode.class);
-        if (node.has("gridVideoRenderer")){
-            List<String> result = context.read("$.onResponseReceivedActions[0].appendContinuationItemsAction." +
-                    "continuationItems.[*].gridVideoRenderer.videoId", new TypeRef<List<String>>() {
-            });
-            ids.addAll(result);
-            try {
-                return context.read("$.onResponseReceivedActions[0].appendContinuationItemsAction.continuationItems[30].continuationItemRenderer.continuationEndpoint.continuationCommand.token");
-            } catch (Exception e) {
-                return "";
+        ThreadLocal<Object> tObject = new ThreadLocal<>();
+        ThreadLocal<Collector> tCollector = new ThreadLocal<>();
+        try {
+            tObject.set(object);
+            String continueStr = "";
+            Collector collector = surfer.collector(mapper.writeValueAsString(object));
+            tCollector.set(collector);
+            ValueBox<Collection<String>> result = collector.collectAll("$.sectionListRenderer.contents[0].itemSectionRenderer.contents[0].gridRenderer.items[*].gridVideoRenderer.videoId", String.class);
+            collector.exec();
+            List<String> temp = new ArrayList<>();
+            temp.addAll(result.get());
+            if (temp.size() == 0) {
+                result = collector.collectAll("$.onResponseReceivedActions[0].appendContinuationItemsAction.continuationItems[*].richItemRenderer.content.videoRenderer.videoId", String.class);
+                collector.exec();
+                temp.addAll(result.get());
             }
-        }
-        else{
-            List<String> result = context.read("$.onResponseReceivedActions[0].appendContinuationItemsAction." +
-                    "continuationItems.[*].richItemRenderer.content.videoRenderer.videoId", new TypeRef<List<String>>() {
-            });
-            ids.addAll(result);
-            try {
-                return context.read("$.onResponseReceivedActions[0].appendContinuationItemsAction.continuationItems[30].continuationItemRenderer.continuationEndpoint.continuationCommand.token");
-            } catch (Exception e) {
-                return "";
-            }
-        }
+            ids.addAll(temp);
 
+            ValueBox<String> continueBox = collector.collectOne("$.onResponseReceivedActions[0].appendContinuationItemsAction.continuationItems[30].continuationItemRenderer.continuationEndpoint.continuationCommand.token", String.class);
+            collector.exec();
+            continueStr = continueBox.get();
+            return continueStr != null ? continueStr : "";
+        } finally {
+            tObject.remove();
+            tCollector.remove();
+        }
     }
 
     public static List<Video> parseVideoDetail(Object object) throws IOException {
-        JsonNode node = mapper.readValue(mapper.writeValueAsString(object), JsonNode.class);
-        List<JsonNode> nodes = jsonPath.parse(object).read("$.[*].microformat", new TypeRef<List<JsonNode>>() {
-        });
-        return mapper.readValue(mapper.writeValueAsString(nodes), new TypeReference<List<Video>>() {});
+        ThreadLocal<Object> tObject = new ThreadLocal<>();
+
+        try {
+            tObject.set(object);
+            Collection<Video> videos = surfer.collectAll(mapper.writeValueAsString(object), Video.class, surferVideoDetail);
+
+            return new ArrayList<>(videos);
+        } finally {
+            tObject.remove();
+        }
     }
 
     public static List<Reaction> parseVideoReaction(Object object) throws IOException {
+        ThreadLocal<Object> tObject = new ThreadLocal<>();
 
-        JsonNode node = jsonPath.parse(object).read("$.[*].contents.twoColumnWatchNextResults.results.results", JsonNode.class);
-        String json = mapper.writeValueAsString(node);
-
-        return mapper.readValue(json, new TypeReference<List<Reaction>>() {});
-
+        try {
+            tObject.set(object);
+            Collection<Reaction> reactions = surfer.collectAll(mapper.writeValueAsString(object), Reaction.class, surferVideoReaction);
+            return new ArrayList<>(reactions);
+        } finally {
+            tObject.remove();
+        }
     }
 
     public static List<String> convertIterToList(Iterator<JsonNode> iterator) {
@@ -130,34 +170,39 @@ public class JsonUtil {
         return result;
     }
 
-    public static String initFirstVideoList(Object obj, List<String> ids) {
-        DocumentContext context = jsonPath
-                .parse(obj);
-        JsonNode node = context.read("$",JsonNode.class);
-        if (node.has("sectionListRenderer")){
-            List<String> result = context.read("$.sectionListRenderer.contents[0].itemSectionRenderer.contents[0].gridRenderer.items." +
-                            "[*].gridVideoRenderer.videoId",
-                    new TypeRef<List<String>>() {
-                    });
-            ids.addAll(result);
-            try {
-                return context.read("$.sectionListRenderer.contents[0].itemSectionRenderer.contents[0].gridRenderer.items[30].continuationItemRenderer.continuationEndpoint.continuationCommand.token");
-            } catch (Exception e) {
-                return "";
-            }
-        }
-        else{
-            List<String> result = context.read("$.richGridRenderer.contents.[*].richItemRenderer.content.videoRenderer.videoId",
-                    new TypeRef<List<String>>() {
-                    });
-            ids.addAll(result);
-            try {
-                return context.read("$.richGridRenderer.contents.[30].continuationItemRenderer.continuationEndpoint.continuationCommand.token");
-            } catch (Exception e) {
-                return "";
-            }
-        }
 
+    public static String initFirstVideoList(Object obj, List<String> ids) throws IOException {
+        ThreadLocal<Object> tObject = new ThreadLocal<>();
+        ThreadLocal<Collector> tCollector = new ThreadLocal<>();
+
+        try {
+            tObject.set(obj);
+            Collector collector = surfer.collector(mapper.writeValueAsString(obj));
+            tCollector.set(collector);
+            String continueStr = "";
+            ValueBox<Collection<String>> result = collector.collectAll("$.sectionListRenderer.contents[0].itemSectionRenderer.contents[0].gridRenderer.items[*].gridVideoRenderer.videoId", String.class);
+            collector.exec();
+            ids.addAll(result.get());
+
+            if (ids.size() == 0) {
+                result = collector.collectAll("$.richGridRenderer.contents[*].richItemRenderer.content.videoRenderer.videoId", String.class);
+                collector.exec();
+                ids.addAll(result.get());
+                if (ids.size() > 0) {
+                    ValueBox<String> continueBox = collector.collectOne("$.richGridRenderer.contents[" + ids.size() + "].continuationItemRenderer.continuationEndpoint.continuationCommand.token", String.class);
+                    collector.exec();
+                    continueStr = continueBox.get();
+                }
+            } else {
+                ValueBox<String> continueBox = collector.collectOne("$.sectionListRenderer.contents[0].itemSectionRenderer.contents[0].gridRenderer.items[" + ids.size() + "].continuationItemRenderer.continuationEndpoint.continuationCommand.token", String.class);
+                collector.exec();
+                continueStr = continueBox.get();
+            }
+            return continueStr != null ? continueStr : "";
+        } finally {
+            tObject.remove();
+            tCollector.remove();
+        }
     }
 
 

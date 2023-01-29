@@ -1,5 +1,6 @@
 package YoutubeService.Model;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.JsonNode;
 import lombok.Getter;
@@ -18,6 +19,7 @@ import static YoutubeService.Util.CommonUtil.parseStringToLong;
 @Setter
 @NoArgsConstructor
 @ToString
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class Reaction implements Serializable {
     private long commentCount = 0;
     private List<String> hashTags;
@@ -25,11 +27,11 @@ public class Reaction implements Serializable {
 
     @JsonProperty("contents")
     private void unpackNested(JsonNode node) {
-        try {
             int i = 0;
             for (; i < node.size(); i++) {
                 if (node.get(i).has("videoPrimaryInfoRenderer")) {
                     JsonNode videoPrimary = node.get(i).get("videoPrimaryInfoRenderer");
+
                     if (videoPrimary.has("superTitleLink")) {
                         Iterator<JsonNode> hashtagIter = videoPrimary.get("superTitleLink").get("runs").iterator();
                         this.setHashTags(convertIterToList(hashtagIter));
@@ -64,15 +66,13 @@ public class Reaction implements Serializable {
                     if (itemSection.has("commentsEntryPointHeaderRenderer")) {
                         itemSection = itemSection.get("commentsEntryPointHeaderRenderer");
                         if (itemSection.has("commentCount")) {
-                            this.setCommentCount(parseStringToLong(itemSection.get("commentCount").get("simpleText").textValue()));
+                            String cmtCount = itemSection.get("commentCount").get("simpleText").textValue();
+                            long cmtc = parseStringToLong(cmtCount);
+                            this.setCommentCount(cmtc);
                         }
                     }
-                    break;
                 }
             }
-        } catch (
-                Exception e) {
-            System.out.println(node.toString());
-        }
+
     }
 }

@@ -10,8 +10,6 @@ import lombok.ToString;
 
 import java.io.Serializable;
 
-import static YoutubeService.Util.CommonUtil.parseUrlGetVideoId;
-
 @Getter
 @Setter
 @ToString
@@ -35,12 +33,13 @@ public class Video implements Serializable {
             if (videos.has("description")){
                 this.description = videos.get("description").get("simpleText").textValue();
             }
-            this.videoId = parseUrlGetVideoId(videos.get("embed").get("iframeUrl").textValue());
+            //this.videoId = parseUrlGetVideoId(videos.get("embed").get("iframeUrl").textValue());
             this.createTime = videos.get("publishDate").textValue();
             this.updateTime = videos.get("uploadDate").textValue();
             this.viewCount = Long.parseLong(videos.get("viewCount").textValue());
         }
         catch (Exception e){
+            System.out.println();
             System.out.println(videos.toString());
         }
     }

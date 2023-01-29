@@ -46,7 +46,7 @@ public class ModPage extends Page {
     }
 
     public String getCoverUrl() {
-        return getCover().getSource();
+        return (getCover()!=null && getCover().getSource()!=null)?getCover().getSource():"";
     }
 
     public List<ChannelCategory> getCategoyIds() {

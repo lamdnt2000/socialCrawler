@@ -59,15 +59,20 @@ public class YoutubeRequest<T extends BaseHeader> {
                             "            \"method\": \"POST\",\n" +
                             "            \"mode\": \"cors\",\n" +
                             "            \"credentials\": \"include\"\n" +
-                            "            }).then(response => response.json())" +
+                            "            }).then(response => response.json()).then(data => data.microformat)" +
                             "    .catch(error => console.warn(error))", URL_ITEM_DETAILS, param);
             list.add(js);
-
-            if ((count++)==99|| i==ids.size()-1){
+            //(count++)==99|| i==ids.size()-1
+            if ((count++)==500|| i==ids.size()-1){
                 params.add("var data = await Promise.all([" + String.join(",", list) + "]);return data");
                 count = 0;
                 list = new ArrayList<>();
             }
+           /* if (i==ids.size()-1){
+                params.add("var data = await Promise.all([" + String.join(",", list) + "]);return data");
+
+                list = new ArrayList<>();
+            }*/
         }
 
         return params ;
@@ -94,15 +99,21 @@ public class YoutubeRequest<T extends BaseHeader> {
                             "            \"method\": \"POST\",\n" +
                             "            \"mode\": \"cors\",\n" +
                             "            \"credentials\": \"include\"\n" +
-                            "            }).then(response => response.json())" +
+                            "            }).then(response => response.json()).then(data=> data.contents.twoColumnWatchNextResults.results.results)" +
                             "    .catch(error => console.warn(error))", URL_ITEM_REACTIONS, param);
             list.add(js);
 
-            if ((count++)==99|| i==videos.size()-1){
+            if ((count++)==500|| i==videos.size()-1){
                 params.add("var data = await Promise.all([" + String.join(",", list) + "]);return data");
                 count = 0;
                 list = new ArrayList<>();
             }
+
+            /*if (i==videos.size()-1){
+                params.add("var data = await Promise.all([" + String.join(",", list) + "]);return data");
+
+                list = new ArrayList<>();
+            }*/
         }
 
         return params ;

@@ -1,7 +1,6 @@
 package FacebookService.Model;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.restfb.Facebook;
 import com.restfb.types.Post;
 import com.restfb.types.Reactions;
@@ -93,30 +92,31 @@ public class ModPost extends Post {
     }
 
     public Long getTotalCare() {
-        return reactionCare.getTotalCount();
+        return (reactionCare!=null)?reactionCare.getTotalCount():0L;
     }
 
     public Long getTotalLike() {
-        return reactionLike.getTotalCount();
+        return (reactionLike!=null)?reactionLike.getTotalCount():0L;
+
     }
 
     public Long getTotalLove() {
-        return reactionLove.getTotalCount();
+        return (reactionLove!=null)?reactionLove.getTotalCount():0L;
     }
 
     public Long getTotalWow() {
-        return reactionWow.getTotalCount();
+        return (reactionWow!=null)?reactionWow.getTotalCount():0L;
     }
 
     public Long getTotalHAHA() {
-        return reactionHAHA.getTotalCount();
+        return (reactionHAHA!=null)?reactionHAHA.getTotalCount():0L;
     }
 
     public Long getTotalSad() {
-        return reactionSad.getTotalCount();
+        return (reactionSad!=null)?reactionSad.getTotalCount():0L;
     }
 
     public Long getTotalAngry() {
-        return reactionAngry.getTotalCount();
+        return (reactionAngry!=null)?reactionAngry.getTotalCount():0L;
     }
 }

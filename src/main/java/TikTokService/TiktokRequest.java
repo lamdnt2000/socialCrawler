@@ -13,17 +13,16 @@ import org.openqa.selenium.WebDriver;
 import javax.crypto.BadPaddingException;
 import javax.crypto.IllegalBlockSizeException;
 import javax.crypto.NoSuchPaddingException;
-
-import static TikTokService.AESUtil.*;
-import static TikTokService.CommonUtil.convertObjectToPara;
-import static TikTokService.TiktokConstants.*;
-
 import java.io.UnsupportedEncodingException;
 import java.security.InvalidAlgorithmParameterException;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.List;
+
+import static TikTokService.AESUtil.encrypt;
+import static TikTokService.CommonUtil.convertObjectToPara;
+import static TikTokService.TiktokConstants.*;
 
 public class TiktokRequest<T extends BaseHeader> {
     private T requestHeader;
