@@ -14,7 +14,7 @@ import java.util.List;
 public class Profile implements Serializable {
    private String id;
    private String uniqueId;
-   private String avatarThumb;
+   private String avatarLarger;
    private String secUid;
    private String nickname;
    private String signature;
